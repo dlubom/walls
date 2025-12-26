@@ -209,10 +209,16 @@ jobs:
 
           # Copy from Walls32/bin to bin/
           if (Test-Path "Walls32/bin") {
-            Get-ChildItem -Path "Walls32/bin" -Include "*.exe", "*.dll" -File | ForEach-Object {
+            Get-ChildItem -Path "Walls32/bin" -File | Where-Object { $_.Extension -in ".exe", ".dll" } | ForEach-Object {
               Write-Host "Copying $($_.Name) to bin/"
               Copy-Item $_.FullName -Destination "bin/" -Force
             }
+          }
+
+          # Copy walls2D.exe from its Release folder
+          if (Test-Path "walls2D/Release/walls2D.exe") {
+            Write-Host "Copying walls2D.exe to bin/"
+            Copy-Item "walls2D/Release/walls2D.exe" -Destination "bin/" -Force
           }
 
           # Create placeholder documentation files (Help+Manual not available in CI)
@@ -243,10 +249,10 @@ jobs:
 
           Write-Host "Using devenv: $devenv"
 
-          # Build the installer project using the solution
-          & $devenv "Walls.sln" /build "Release" /project "WallsInstaller"
+          # Build the installer project directly (vdproj file, not part of a solution)
+          & $devenv "WallsInstaller\WallsInstaller.vdproj" /build "Release"
 
-          # Check if MSI was created
+          # Check if MSI was created (vdproj outputs to ..\bin relative to its location)
           $msiPath = "bin\WallsInstaller.msi"
           if (Test-Path $msiPath) {
             Write-Host "Installer built successfully: $msiPath"
