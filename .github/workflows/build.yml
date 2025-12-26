@@ -178,30 +178,6 @@ jobs:
             /m `
             /verbosity:minimal
 
-      - name: Install VS Installer Projects extension
-        run: |
-          # Download the Visual Studio Installer Projects extension for VS2022
-          $vsixUrl = "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/VisualStudioClient/vsextensions/MicrosoftVisualStudio2022InstallerProjects/2.0.1/vspackage"
-          $vsixPath = "$env:TEMP\InstallerProjects.vsix"
-
-          Write-Host "Downloading VS Installer Projects extension..."
-          Invoke-WebRequest -Uri $vsixUrl -OutFile $vsixPath -UseBasicParsing
-
-          # Find VSIXInstaller for VS2022
-          $vsixInstaller = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\VSIXInstaller.exe"
-          if (-not (Test-Path $vsixInstaller)) {
-            $vsixInstaller = Get-ChildItem -Path "C:\Program Files\Microsoft Visual Studio\2022" -Recurse -Filter "VSIXInstaller.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-          }
-
-          if ($vsixInstaller) {
-            Write-Host "Installing extension using $vsixInstaller"
-            Start-Process -FilePath $vsixInstaller -ArgumentList "/quiet", "/admin", $vsixPath -Wait -NoNewWindow
-            Start-Sleep -Seconds 10
-            Write-Host "Extension installation completed"
-          } else {
-            Write-Host "WARNING: VSIXInstaller not found"
-          }
-
       - name: Setup installer files
         run: |
           # Copy built files to bin/ at root level (where vdproj expects them)
@@ -236,32 +212,19 @@ jobs:
 
       - name: Build Installer
         run: |
-          # Find devenv.com for VS2022
-          $devenv = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\devenv.com"
-          if (-not (Test-Path $devenv)) {
-            $devenv = Get-ChildItem -Path "C:\Program Files\Microsoft Visual Studio\2022" -Recurse -Filter "devenv.com" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-          }
+          # Install Inno Setup
+          choco install innosetup -y --no-progress
 
-          if (-not $devenv) {
-            Write-Host "WARNING: devenv.com not found, skipping installer build"
-            exit 0
-          }
+          # Build installer using Inno Setup
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "WallsInstaller\walls.iss"
 
-          Write-Host "Using devenv: $devenv"
-
-          # Build the installer project directly (vdproj file, not part of a solution)
-          & $devenv "WallsInstaller\WallsInstaller.vdproj" /build "Release"
-
-          # Check if MSI was created (vdproj outputs to ..\bin relative to its location)
-          $msiPath = "bin\WallsInstaller.msi"
-          if (Test-Path $msiPath) {
-            Write-Host "Installer built successfully: $msiPath"
-            Get-Item $msiPath | Select-Object Name, Length, LastWriteTime
+          # Check if installer was created
+          if (Test-Path "bin\WallsInstaller.exe") {
+            Write-Host "Installer built successfully!"
+            Get-Item "bin\WallsInstaller.exe" | Select-Object Name, Length, LastWriteTime
           } else {
-            Write-Host "Looking for MSI in other locations..."
-            Get-ChildItem -Path "." -Recurse -Filter "*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
-              Write-Host "Found: $($_.FullName)"
-            }
+            Write-Host "Installer not found, checking for errors..."
+            exit 1
           }
         continue-on-error: true
 
@@ -272,7 +235,7 @@ jobs:
           path: |
             Walls32/bin/*.exe
             Walls32/bin/*.dll
-            bin/WallsInstaller.msi
+            bin/WallsInstaller.exe
           retention-days: 7
 
   # ==============================================================================
