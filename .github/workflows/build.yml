@@ -276,7 +276,8 @@ jobs:
             "iqalib",
             "libgeoref",
             "libloco",
-            "dbf_file"
+            "dbf_file",
+            "ECW_3.3"
           )
           foreach ($lib in $wallsMapLibs) {
             if (Test-Path $lib) {
