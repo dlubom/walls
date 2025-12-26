@@ -264,14 +264,19 @@ jobs:
             Copy-Item -Path "lib" -Destination "WallsMap/lib" -Recurse -Force
           }
 
-          # Copy libjpeg-turbo and libjpegtbo to WallsMap/ where the projects expect them
-          if (Test-Path "libjpeg-turbo") {
-            Write-Host "Copying libjpeg-turbo to WallsMap/"
-            Copy-Item -Path "libjpeg-turbo" -Destination "WallsMap/libjpeg-turbo" -Recurse -Force
-          }
-          if (Test-Path "libjpegtbo") {
-            Write-Host "Copying libjpegtbo to WallsMap/"
-            Copy-Item -Path "libjpegtbo" -Destination "WallsMap/libjpegtbo" -Recurse -Force
+          # Copy libraries to WallsMap/ where $(WorkDIR) = $(SolutionDir) = WallsMap/
+          $wallsMapLibs = @(
+            "libjpeg-turbo",
+            "libjpegtbo",
+            "Serial",
+            "libgdal_1110",
+            "libpng164"
+          )
+          foreach ($lib in $wallsMapLibs) {
+            if (Test-Path $lib) {
+              Write-Host "Copying $lib to WallsMap/$lib"
+              Copy-Item -Path $lib -Destination "WallsMap/$lib" -Recurse -Force
+            }
           }
 
           # Checkout is at D:\a\walls\walls\
