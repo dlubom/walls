@@ -386,6 +386,15 @@ jobs:
             Write-Host "Fixed UpdateTSS Windows SDK version to 10.0"
           }
 
+          # Fix arc_date.c: timezone -> _timezone for MSVC compatibility
+          $arcDatePath = "dbf_file/dbfv/arc_date.c"
+          if (Test-Path $arcDatePath) {
+            $arcDateContent = Get-Content $arcDatePath -Raw
+            $arcDateContent = $arcDateContent -replace '\+timezone;', '+_timezone;'
+            Set-Content $arcDatePath -Value $arcDateContent -NoNewline
+            Write-Host "Fixed arc_date.c timezone -> _timezone"
+          }
+
           # Fix libjpegtbo CMake custom build issues
           # Create stamp file so CMake custom builds think they're up-to-date
           $stampDir = "WallsMap/libjpegtbo/CMakeFiles"
