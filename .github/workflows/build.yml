@@ -338,12 +338,10 @@ jobs:
           $slnContent = Get-Content $slnPath -Raw
 
           # Add Build.0 for libgeoref (GUID: 51964B44-58AA-4FBA-99B7-539104B81F85)
-          $slnContent = $slnContent -replace '(\{51964B44-58AA-4FBA-99B7-539104B81F85\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', '$1
-		{51964B44-58AA-4FBA-99B7-539104B81F85}.Release|Mixed Platforms.Build.0 = Release|Win32'
+          $slnContent = $slnContent -replace '(\{51964B44-58AA-4FBA-99B7-539104B81F85\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{51964B44-58AA-4FBA-99B7-539104B81F85}.Release|Mixed Platforms.Build.0 = Release|Win32"
 
           # Add Build.0 for iqalib (GUID: 3C7BB421-C147-4828-8EAE-53A5F1A0394A)
-          $slnContent = $slnContent -replace '(\{3C7BB421-C147-4828-8EAE-53A5F1A0394A\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', '$1
-		{3C7BB421-C147-4828-8EAE-53A5F1A0394A}.Release|Mixed Platforms.Build.0 = Release|Win32'
+          $slnContent = $slnContent -replace '(\{3C7BB421-C147-4828-8EAE-53A5F1A0394A\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{3C7BB421-C147-4828-8EAE-53A5F1A0394A}.Release|Mixed Platforms.Build.0 = Release|Win32"
 
           Set-Content $slnPath -Value $slnContent -NoNewline
           Write-Host "Added Build.0 entries for libgeoref and iqalib"
