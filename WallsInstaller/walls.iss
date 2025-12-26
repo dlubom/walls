@@ -55,8 +55,8 @@ Source: "Postinstall.rtf"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedo
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\Walls 3D Viewer"; Filename: "{app}\walls3d.exe"; Flags: skipifsourcedoesntexist
-Name: "{group}\Walls 2D"; Filename: "{app}\walls2D.exe"; Flags: skipifsourcedoesntexist
+Name: "{group}\Walls 3D Viewer"; Filename: "{app}\walls3d.exe"
+Name: "{group}\Walls 2D"; Filename: "{app}\walls2D.exe"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
