@@ -5,7 +5,7 @@ name: Build Walls
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, installer]
     tags: ['v*']
   pull_request:
     branches: [master, main]
@@ -178,6 +178,56 @@ jobs:
             /m `
             /verbosity:minimal
 
+      - name: Setup installer files
+        run: |
+          # Copy built files to bin/ at root level (where vdproj expects them)
+          New-Item -ItemType Directory -Force -Path "bin" | Out-Null
+
+          # Copy from Walls32/bin to bin/
+          if (Test-Path "Walls32/bin") {
+            Get-ChildItem -Path "Walls32/bin" -File | Where-Object { $_.Extension -in ".exe", ".dll" } | ForEach-Object {
+              Write-Host "Copying $($_.Name) to bin/"
+              Copy-Item $_.FullName -Destination "bin/" -Force
+            }
+          }
+
+          # Copy walls2D.exe from its Release folder
+          if (Test-Path "walls2D/Release/walls2D.exe") {
+            Write-Host "Copying walls2D.exe to bin/"
+            Copy-Item "walls2D/Release/walls2D.exe" -Destination "bin/" -Force
+          }
+
+          # Create placeholder documentation files (Help+Manual not available in CI)
+          if (-not (Test-Path "bin/Walls_manual.pdf")) {
+            Write-Host "Creating placeholder for Walls_manual.pdf"
+            "Walls Manual - See https://github.com/wallscavesurvey/walls" | Out-File -FilePath "bin/Walls_manual.pdf" -Encoding utf8
+          }
+          if (-not (Test-Path "bin/walls32.chm")) {
+            Write-Host "Creating placeholder for walls32.chm"
+            New-Item -ItemType File -Force -Path "bin/walls32.chm" | Out-Null
+          }
+
+          Write-Host "Contents of bin/:"
+          Get-ChildItem -Path "bin" | Format-Table Name, Length
+
+      - name: Build Installer
+        run: |
+          # Install Inno Setup
+          choco install innosetup -y --no-progress
+
+          # Build installer using Inno Setup
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "WallsInstaller\walls.iss"
+
+          # Check if installer was created
+          if (Test-Path "bin\WallsInstaller.exe") {
+            Write-Host "Installer built successfully!"
+            Get-Item "bin\WallsInstaller.exe" | Select-Object Name, Length, LastWriteTime
+          } else {
+            Write-Host "Installer not found, checking for errors..."
+            exit 1
+          }
+        continue-on-error: true
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -185,6 +235,7 @@ jobs:
           path: |
             Walls32/bin/*.exe
             Walls32/bin/*.dll
+            bin/WallsInstaller.exe
           retention-days: 7
 
   # ==============================================================================
@@ -213,14 +264,26 @@ jobs:
             Copy-Item -Path "lib" -Destination "WallsMap/lib" -Recurse -Force
           }
 
-          # Copy libjpeg-turbo and libjpegtbo to WallsMap/ where the projects expect them
-          if (Test-Path "libjpeg-turbo") {
-            Write-Host "Copying libjpeg-turbo to WallsMap/"
-            Copy-Item -Path "libjpeg-turbo" -Destination "WallsMap/libjpeg-turbo" -Recurse -Force
-          }
-          if (Test-Path "libjpegtbo") {
-            Write-Host "Copying libjpegtbo to WallsMap/"
-            Copy-Item -Path "libjpegtbo" -Destination "WallsMap/libjpegtbo" -Recurse -Force
+          # Copy libraries to WallsMap/ where $(WorkDIR) = $(SolutionDir) = WallsMap/
+          $wallsMapLibs = @(
+            "libjpeg-turbo",
+            "libjpegtbo",
+            "Serial",
+            "libgdal_1110",
+            "libpng164",
+            "Kakadu6_4",
+            "zlib-1.2.8",
+            "iqalib",
+            "libgeoref",
+            "libloco",
+            "dbf_file",
+            "ECW_3.3"
+          )
+          foreach ($lib in $wallsMapLibs) {
+            if (Test-Path $lib) {
+              Write-Host "Copying $lib to WallsMap/$lib"
+              Copy-Item -Path $lib -Destination "WallsMap/$lib" -Recurse -Force
+            }
           }
 
           # Checkout is at D:\a\walls\walls\
@@ -240,7 +303,10 @@ jobs:
             "libgdal_1110",
             "libpng164",
             "libjpegtbo",
-            "libwebp"
+            "libwebp",
+            "libgeoref",
+            "libloco",
+            "dbf_file"
           )
           foreach ($lib in $libs) {
             $src = Join-Path (Get-Location) $lib
@@ -271,6 +337,64 @@ jobs:
 
           Set-Content $slnPath -Value $content -NoNewline
           Write-Host "Removed missing projects from WallsMap.sln"
+
+          # Add Build.0 entries for libgeoref and iqalib for Release|Mixed Platforms
+          # These projects have ActiveCfg but missing Build.0 entries
+          $slnContent = Get-Content $slnPath -Raw
+
+          # Add Build.0 for libgeoref (GUID: 51964B44-58AA-4FBA-99B7-539104B81F85)
+          $slnContent = $slnContent -replace '(\{51964B44-58AA-4FBA-99B7-539104B81F85\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{51964B44-58AA-4FBA-99B7-539104B81F85}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for iqalib (GUID: 3C7BB421-C147-4828-8EAE-53A5F1A0394A)
+          $slnContent = $slnContent -replace '(\{3C7BB421-C147-4828-8EAE-53A5F1A0394A\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{3C7BB421-C147-4828-8EAE-53A5F1A0394A}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libloco (GUID: C01FAD87-CF2D-4336-AAF5-3F6DD4E9D593)
+          $slnContent = $slnContent -replace '(\{C01FAD87-CF2D-4336-AAF5-3F6DD4E9D593\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{C01FAD87-CF2D-4336-AAF5-3F6DD4E9D593}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for dbf_file (GUID: 3F61C2DA-FAB7-477B-96A6-5CF2D786C56D)
+          $slnContent = $slnContent -replace '(\{3F61C2DA-FAB7-477B-96A6-5CF2D786C56D\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{3F61C2DA-FAB7-477B-96A6-5CF2D786C56D}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libgdal_1110 (GUID: 07246777-7600-4117-8F4E-F3592AAC97D1)
+          $slnContent = $slnContent -replace '(\{07246777-7600-4117-8F4E-F3592AAC97D1\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{07246777-7600-4117-8F4E-F3592AAC97D1}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for dbfv (GUID: 43E22DD8-63D1-444A-82C5-5DFA0443A7B7)
+          $slnContent = $slnContent -replace '(\{43E22DD8-63D1-444A-82C5-5DFA0443A7B7\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{43E22DD8-63D1-444A-82C5-5DFA0443A7B7}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for Kakadu6_4 (GUID: F1CFE0F2-72DA-464C-B752-38A198476012)
+          $slnContent = $slnContent -replace '(\{F1CFE0F2-72DA-464C-B752-38A198476012\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{F1CFE0F2-72DA-464C-B752-38A198476012}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libecwj2S (GUID: A6103D1E-3E79-33F6-A4C9-19CE5E183F65)
+          $slnContent = $slnContent -replace '(\{A6103D1E-3E79-33F6-A4C9-19CE5E183F65\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{A6103D1E-3E79-33F6-A4C9-19CE5E183F65}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libwebp (GUID: E55DDD38-D597-4AF4-8C2C-94D84DE6A9AB)
+          $slnContent = $slnContent -replace '(\{E55DDD38-D597-4AF4-8C2C-94D84DE6A9AB\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{E55DDD38-D597-4AF4-8C2C-94D84DE6A9AB}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for dbf-filter (GUID: DC33E275-BBFF-4E22-B082-B613DBA3991F)
+          $slnContent = $slnContent -replace '(\{DC33E275-BBFF-4E22-B082-B613DBA3991F\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{DC33E275-BBFF-4E22-B082-B613DBA3991F}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libpng164 (GUID: E07A7B76-08BA-430B-B1AA-883F75DE2379)
+          $slnContent = $slnContent -replace '(\{E07A7B76-08BA-430B-B1AA-883F75DE2379\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{E07A7B76-08BA-430B-B1AA-883F75DE2379}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          Set-Content $slnPath -Value $slnContent -NoNewline
+          Write-Host "Added Build.0 entries for libgeoref and iqalib"
+
+          # Fix UpdateTSS Windows SDK version from 8.1 to 10.0
+          $updateTssPath = "UpdateTSS/UpdateTSS.vcxproj"
+          if (Test-Path $updateTssPath) {
+            $updateTssXml = Get-Content $updateTssPath -Raw
+            $updateTssXml = $updateTssXml -replace '<WindowsTargetPlatformVersion>8\.1</WindowsTargetPlatformVersion>', '<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>'
+            Set-Content $updateTssPath -Value $updateTssXml -NoNewline
+            Write-Host "Fixed UpdateTSS Windows SDK version to 10.0"
+          }
+
+          # Fix arc_date.c: timezone -> _timezone for MSVC compatibility
+          $arcDatePath = "dbf_file/dbfv/arc_date.c"
+          if (Test-Path $arcDatePath) {
+            $arcDateContent = Get-Content $arcDatePath -Raw
+            $arcDateContent = $arcDateContent -replace '\+timezone;', '+_timezone;'
+            Set-Content $arcDatePath -Value $arcDateContent -NoNewline
+            Write-Host "Fixed arc_date.c timezone -> _timezone"
+          }
 
           # Fix libjpegtbo CMake custom build issues
           # Create stamp file so CMake custom builds think they're up-to-date
@@ -360,10 +484,13 @@ jobs:
 
       - name: Build WallsMap
         run: |
+          # Use "Mixed Platforms" because the solution file only has Build.0 entries
+          # for WallsMap and most other projects under "Mixed Platforms", not "Win32"
+
           # First pass - builds libraries (may have link errors, that's expected)
           msbuild ${{ env.WALLSMAP_SOLUTION_PATH }} `
             /p:Configuration=Release `
-            /p:Platform=Win32 `
+            "/p:Platform=Mixed Platforms" `
             /p:PlatformToolset=v143 `
             /m `
             /verbosity:minimal `
@@ -372,10 +499,25 @@ jobs:
           # Second pass - now all libs are built, linking should succeed
           msbuild ${{ env.WALLSMAP_SOLUTION_PATH }} `
             /p:Configuration=Release `
-            /p:Platform=Win32 `
+            "/p:Platform=Mixed Platforms" `
             /p:PlatformToolset=v143 `
             /m `
             /verbosity:minimal
+
+      - name: List build output
+        run: |
+          Write-Host "=== WallsMap/Release ==="
+          if (Test-Path "WallsMap/Release") {
+            Get-ChildItem -Path "WallsMap/Release" -Recurse | Where-Object { $_.Extension -in ".exe", ".dll" } | ForEach-Object {
+              Write-Host "$($_.FullName) - $($_.Length) bytes"
+            }
+          } else {
+            Write-Host "Directory WallsMap/Release does not exist"
+          }
+          Write-Host "=== Looking for WallsMap.exe anywhere ==="
+          Get-ChildItem -Path "." -Recurse -Filter "WallsMap.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "$($_.FullName) - $($_.Length) bytes"
+          }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -413,10 +555,18 @@ jobs:
           $tag = "${{ github.ref_name }}"
           Compress-Archive -Path "release-files/*" -DestinationPath "Walls-$tag.zip"
 
+          # Also prepare installer as standalone download if it exists
+          $installerPath = Get-ChildItem -Path "release-files" -Filter "*.msi" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($installerPath) {
+            Copy-Item $installerPath.FullName -Destination "WallsInstaller-$tag.msi"
+          }
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: Walls-*.zip
+          files: |
+            Walls-*.zip
+            WallsInstaller-*.msi
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
