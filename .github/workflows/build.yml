@@ -387,11 +387,137 @@ jobs:
           retention-days: 7
 
   # ==============================================================================
+  # INSTALLER BUILD
+  # ==============================================================================
+  build-installer:
+    runs-on: windows-2019  # Use VS2019 for better vdproj support
+    needs: [build-walls]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Walls artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: walls-Release-x86
+          path: downloaded-artifacts
+
+      - name: Setup build files
+        run: |
+          # Create bin directory and copy built artifacts
+          New-Item -ItemType Directory -Force -Path "bin" | Out-Null
+
+          # Copy all exe and dll files from downloaded artifacts to bin
+          Get-ChildItem -Path "downloaded-artifacts" -Recurse -Include "*.exe", "*.dll" | ForEach-Object {
+            Write-Host "Copying $($_.Name) to bin/"
+            Copy-Item $_.FullName -Destination "bin/" -Force
+          }
+
+          # List what we have
+          Write-Host "Contents of bin/:"
+          Get-ChildItem -Path "bin"
+
+          # Create Walls_Setup directory for runwalls.exe if it doesn't exist
+          if (-not (Test-Path "Walls_Setup")) {
+            New-Item -ItemType Directory -Force -Path "Walls_Setup" | Out-Null
+          }
+
+          # Copy runwalls.exe to Walls_Setup if it was built
+          if (Test-Path "bin/runwalls.exe") {
+            Copy-Item "bin/runwalls.exe" -Destination "Walls_Setup/" -Force
+          }
+
+          # Create walls2D/Release directory if needed
+          if (-not (Test-Path "walls2D/Release")) {
+            New-Item -ItemType Directory -Force -Path "walls2D/Release" | Out-Null
+          }
+          if (Test-Path "bin/walls2D.exe") {
+            Copy-Item "bin/walls2D.exe" -Destination "walls2D/Release/" -Force
+          }
+
+          # Create placeholder files for documentation if not present
+          # (these would normally be built by Help+Manual which isn't available in CI)
+          if (-not (Test-Path "bin/Walls_manual.pdf")) {
+            Write-Host "Creating placeholder for Walls_manual.pdf"
+            "Walls Manual - See https://github.com/wallscavesurvey/walls" | Out-File -FilePath "bin/Walls_manual.pdf" -Encoding utf8
+          }
+          if (-not (Test-Path "bin/walls32.chm")) {
+            Write-Host "Creating placeholder for walls32.chm"
+            # Create minimal CHM placeholder
+            New-Item -ItemType File -Force -Path "bin/walls32.chm" | Out-Null
+          }
+
+      - name: Install VS Installer Projects extension
+        run: |
+          # Download the Visual Studio Installer Projects extension
+          $vsixUrl = "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/VisualStudioClient/vsextensions/MicrosoftVisualStudio2017InstallerProjects/1.0.0/vspackage"
+          $vsixPath = "$env:TEMP\InstallerProjects.vsix"
+
+          Write-Host "Downloading VS Installer Projects extension..."
+          Invoke-WebRequest -Uri $vsixUrl -OutFile $vsixPath -UseBasicParsing
+
+          # Find VSIXInstaller
+          $vsixInstaller = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\IDE\VSIXInstaller.exe"
+          if (-not (Test-Path $vsixInstaller)) {
+            $vsixInstaller = Get-ChildItem -Path "C:\Program Files (x86)\Microsoft Visual Studio" -Recurse -Filter "VSIXInstaller.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if ($vsixInstaller) {
+            Write-Host "Installing extension using $vsixInstaller"
+            Start-Process -FilePath $vsixInstaller -ArgumentList "/quiet", "/admin", $vsixPath -Wait -NoNewWindow
+            Write-Host "Extension installation completed"
+          } else {
+            Write-Host "VSIXInstaller not found, trying alternative method..."
+          }
+
+      - name: Build Installer
+        run: |
+          # Find devenv.com
+          $devenv = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\Common7\IDE\devenv.com"
+          if (-not (Test-Path $devenv)) {
+            $devenv = Get-ChildItem -Path "C:\Program Files (x86)\Microsoft Visual Studio" -Recurse -Filter "devenv.com" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          }
+
+          if (-not $devenv) {
+            Write-Error "devenv.com not found"
+            exit 1
+          }
+
+          Write-Host "Using devenv: $devenv"
+
+          # Build the installer project
+          # Note: vdproj files must be built with devenv, not msbuild
+          & $devenv "WallsInstaller\WallsInstaller.vdproj" /build "Release"
+
+          # Check if MSI was created
+          $msiPath = "bin\WallsInstaller.msi"
+          if (Test-Path $msiPath) {
+            Write-Host "Installer built successfully: $msiPath"
+            Get-Item $msiPath | Select-Object Name, Length, LastWriteTime
+          } else {
+            Write-Host "Looking for MSI in other locations..."
+            Get-ChildItem -Path "." -Recurse -Filter "*.msi" | ForEach-Object {
+              Write-Host "Found: $($_.FullName)"
+            }
+          }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: walls-installer
+          path: |
+            bin/WallsInstaller.msi
+            WallsInstaller/Release/*.msi
+          retention-days: 7
+          if-no-files-found: warn
+
+  # ==============================================================================
   # RELEASE (on tags)
   # ==============================================================================
   release:
     runs-on: windows-latest
-    needs: [build-walls, build-wallsmap]
+    needs: [build-walls, build-wallsmap, build-installer]
     if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
@@ -408,15 +534,30 @@ jobs:
           path: release-files/wallsmap
         continue-on-error: true
 
+      - name: Download Installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: walls-installer
+          path: release-files/installer
+        continue-on-error: true
+
       - name: Create release archive
         run: |
           $tag = "${{ github.ref_name }}"
           Compress-Archive -Path "release-files/*" -DestinationPath "Walls-$tag.zip"
 
+          # Also prepare installer as standalone download
+          $installerPath = Get-ChildItem -Path "release-files/installer" -Filter "*.msi" -Recurse | Select-Object -First 1
+          if ($installerPath) {
+            Copy-Item $installerPath.FullName -Destination "WallsInstaller-$tag.msi"
+          }
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: Walls-*.zip
+          files: |
+            Walls-*.zip
+            WallsInstaller-*.msi
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
