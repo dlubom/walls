@@ -274,7 +274,9 @@ jobs:
             "Kakadu6_4",
             "zlib-1.2.8",
             "iqalib",
-            "libgeoref"
+            "libgeoref",
+            "libloco",
+            "dbf_file"
           )
           foreach ($lib in $wallsMapLibs) {
             if (Test-Path $lib) {
@@ -301,7 +303,9 @@ jobs:
             "libpng164",
             "libjpegtbo",
             "libwebp",
-            "libgeoref"
+            "libgeoref",
+            "libloco",
+            "dbf_file"
           )
           foreach ($lib in $libs) {
             $src = Join-Path (Get-Location) $lib
@@ -342,6 +346,12 @@ jobs:
 
           # Add Build.0 for iqalib (GUID: 3C7BB421-C147-4828-8EAE-53A5F1A0394A)
           $slnContent = $slnContent -replace '(\{3C7BB421-C147-4828-8EAE-53A5F1A0394A\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{3C7BB421-C147-4828-8EAE-53A5F1A0394A}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libloco (GUID: C01FAD87-CF2D-4336-AAF5-3F6DD4E9D593)
+          $slnContent = $slnContent -replace '(\{C01FAD87-CF2D-4336-AAF5-3F6DD4E9D593\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{C01FAD87-CF2D-4336-AAF5-3F6DD4E9D593}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for dbf_file (GUID: 3F61C2DA-FAB7-477B-96A6-5CF2D786C56D)
+          $slnContent = $slnContent -replace '(\{3F61C2DA-FAB7-477B-96A6-5CF2D786C56D\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{3F61C2DA-FAB7-477B-96A6-5CF2D786C56D}.Release|Mixed Platforms.Build.0 = Release|Win32"
 
           Set-Content $slnPath -Value $slnContent -NoNewline
           Write-Host "Added Build.0 entries for libgeoref and iqalib"
