@@ -356,6 +356,24 @@ jobs:
           # Add Build.0 for libgdal_1110 (GUID: 07246777-7600-4117-8F4E-F3592AAC97D1)
           $slnContent = $slnContent -replace '(\{07246777-7600-4117-8F4E-F3592AAC97D1\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{07246777-7600-4117-8F4E-F3592AAC97D1}.Release|Mixed Platforms.Build.0 = Release|Win32"
 
+          # Add Build.0 for dbfv (GUID: 43E22DD8-63D1-444A-82C5-5DFA0443A7B7)
+          $slnContent = $slnContent -replace '(\{43E22DD8-63D1-444A-82C5-5DFA0443A7B7\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{43E22DD8-63D1-444A-82C5-5DFA0443A7B7}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for Kakadu6_4 (GUID: F1CFE0F2-72DA-464C-B752-38A198476012)
+          $slnContent = $slnContent -replace '(\{F1CFE0F2-72DA-464C-B752-38A198476012\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{F1CFE0F2-72DA-464C-B752-38A198476012}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libecwj2S (GUID: A6103D1E-3E79-33F6-A4C9-19CE5E183F65)
+          $slnContent = $slnContent -replace '(\{A6103D1E-3E79-33F6-A4C9-19CE5E183F65\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{A6103D1E-3E79-33F6-A4C9-19CE5E183F65}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libwebp (GUID: E55DDD38-D597-4AF4-8C2C-94D84DE6A9AB)
+          $slnContent = $slnContent -replace '(\{E55DDD38-D597-4AF4-8C2C-94D84DE6A9AB\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{E55DDD38-D597-4AF4-8C2C-94D84DE6A9AB}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for dbf-filter (GUID: DC33E275-BBFF-4E22-B082-B613DBA3991F)
+          $slnContent = $slnContent -replace '(\{DC33E275-BBFF-4E22-B082-B613DBA3991F\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{DC33E275-BBFF-4E22-B082-B613DBA3991F}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
+          # Add Build.0 for libpng164 (GUID: E07A7B76-08BA-430B-B1AA-883F75DE2379)
+          $slnContent = $slnContent -replace '(\{E07A7B76-08BA-430B-B1AA-883F75DE2379\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', "`$1`r`n`t`t{E07A7B76-08BA-430B-B1AA-883F75DE2379}.Release|Mixed Platforms.Build.0 = Release|Win32"
+
           Set-Content $slnPath -Value $slnContent -NoNewline
           Write-Host "Added Build.0 entries for libgeoref and iqalib"
 
