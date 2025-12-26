@@ -270,7 +270,11 @@ jobs:
             "libjpegtbo",
             "Serial",
             "libgdal_1110",
-            "libpng164"
+            "libpng164",
+            "Kakadu6_4",
+            "zlib-1.2.8",
+            "iqalib",
+            "libgeoref"
           )
           foreach ($lib in $wallsMapLibs) {
             if (Test-Path $lib) {
@@ -296,7 +300,8 @@ jobs:
             "libgdal_1110",
             "libpng164",
             "libjpegtbo",
-            "libwebp"
+            "libwebp",
+            "libgeoref"
           )
           foreach ($lib in $libs) {
             $src = Join-Path (Get-Location) $lib
@@ -327,6 +332,30 @@ jobs:
 
           Set-Content $slnPath -Value $content -NoNewline
           Write-Host "Removed missing projects from WallsMap.sln"
+
+          # Add Build.0 entries for libgeoref and iqalib for Release|Mixed Platforms
+          # These projects have ActiveCfg but missing Build.0 entries
+          $slnContent = Get-Content $slnPath -Raw
+
+          # Add Build.0 for libgeoref (GUID: 51964B44-58AA-4FBA-99B7-539104B81F85)
+          $slnContent = $slnContent -replace '(\{51964B44-58AA-4FBA-99B7-539104B81F85\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', '$1
+		{51964B44-58AA-4FBA-99B7-539104B81F85}.Release|Mixed Platforms.Build.0 = Release|Win32'
+
+          # Add Build.0 for iqalib (GUID: 3C7BB421-C147-4828-8EAE-53A5F1A0394A)
+          $slnContent = $slnContent -replace '(\{3C7BB421-C147-4828-8EAE-53A5F1A0394A\}\.Release\|Mixed Platforms\.ActiveCfg = Release\|Win32)', '$1
+		{3C7BB421-C147-4828-8EAE-53A5F1A0394A}.Release|Mixed Platforms.Build.0 = Release|Win32'
+
+          Set-Content $slnPath -Value $slnContent -NoNewline
+          Write-Host "Added Build.0 entries for libgeoref and iqalib"
+
+          # Fix UpdateTSS Windows SDK version from 8.1 to 10.0
+          $updateTssPath = "UpdateTSS/UpdateTSS.vcxproj"
+          if (Test-Path $updateTssPath) {
+            $updateTssXml = Get-Content $updateTssPath -Raw
+            $updateTssXml = $updateTssXml -replace '<WindowsTargetPlatformVersion>8\.1</WindowsTargetPlatformVersion>', '<WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>'
+            Set-Content $updateTssPath -Value $updateTssXml -NoNewline
+            Write-Host "Fixed UpdateTSS Windows SDK version to 10.0"
+          }
 
           # Fix libjpegtbo CMake custom build issues
           # Create stamp file so CMake custom builds think they're up-to-date
